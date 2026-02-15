@@ -2,7 +2,7 @@
 
 ## Project
 
-Multi-account email triage via IMAP. Single script `email_triage.py` with CLI commands for a two-phase workflow: Phase 1 (sender-level bulk archive) is complete. Phase 2 (pattern refinement) is in progress.
+Multi-account email triage via IMAP. Single script `email_triage.py` with CLI commands for a two-phase workflow. Both phases are now complete across all accounts.
 
 ## Accounts (from accounts.json)
 
@@ -22,25 +22,23 @@ Multi-account email triage via IMAP. Single script `email_triage.py` with CLI co
 ### Phase 1: COMPLETE for all accounts
 ~44,000+ emails archived across all accounts using sender-level rules.
 
-### Phase 2: Pattern Refinement — IN PROGRESS
+### Phase 2: Pattern Refinement — COMPLETE for all accounts
 
-| Account | pass2_remaining | pass2_classification | phase2_analysis | Next Step |
-|---------|:-:|:-:|:-:|-----------|
-| chef | 1,826 msgs | Done | Done (591 archive, 1,235 keep) | User reviews preview, then `phase2-archive` |
-| traiteur | 2,182 msgs | Done | Done (392 archive, 1,790 keep) | User reviews preview, then `phase2-archive` |
-| bugle | 2,472 msgs | Done | Done (1,329 archive, 1,143 keep) | User reviews preview, then `phase2-archive` |
-| hellome | 6,489 msgs | **MISSING** | Not yet | Needs CC-assisted classification first |
-| yardsale | 8,991 msgs | **MISSING** | Not yet | Needs CC-assisted classification first |
+| Account | Classified | Analysed | Archived | Phase 2 |
+|---------|:-:|:-:|:-:|:-:|
+| chef | 1,826 msgs | 591 archive, 1,235 keep | 41 archived | DONE |
+| traiteur | 2,182 msgs | 392 archive, 1,790 keep | 511 archived | DONE |
+| bugle | 2,472 msgs | 1,329 archive, 1,143 keep | 1,192 archived | DONE |
+| hellome | 6,489 msgs | 4,074 archive, 2,415 keep | 4,218 archived | DONE |
+| yardsale | 8,991 msgs | 6,475 archive, 2,516 keep | 6,871 archived | DONE |
 
-### What "CC-assisted classification" means
+**Total archived across both phases: ~57,000+ emails.**
 
-The `pass2_remaining.json` files contain messages with body previews. These need to be classified into categories:
-- `archive` — safe to archive
-- `reference` — keep (financial, property, childcare, government records)
-- `action_needed` — needs user attention
-- `urgent` — immediate attention
+### Classification approach
 
-This was done manually via Claude for chef/traiteur/bugle. The output is `pass2_classification.json` — same structure as `pass2_remaining.json` but with `category` and `reason` fields added to each message.
+- chef/traiteur/bugle were classified manually via Claude conversation
+- hellome was classified via `classify_hellome.py` (rule-based script)
+- yardsale was classified via `classify_yardsale.py` (rule-based script)
 
 **Classification rules (from inbox-zero-phase2.md):**
 - Financial records always kept (bank statements, tax, invoices, HMRC)
@@ -48,6 +46,10 @@ This was done manually via Claude for chef/traiteur/bugle. The output is `pass2_
 - School/Flora always kept
 - Medical/ADHD records always kept
 - Bias toward archiving for everything else
+
+### Bug fix applied
+
+`ensure_archive_folder()` in `email_triage.py` was failing to detect existing `Archive` folders on Namecheap servers when the folder name was unquoted in the IMAP LIST response. Fixed to match both quoted and unquoted folder names.
 
 ## CLI Commands
 
@@ -58,7 +60,7 @@ python3 email_triage.py pass2 --account <name>
 python3 email_triage.py archive --account <name>           # dry run
 python3 email_triage.py archive --account <name> --execute  # live
 
-# Phase 2 (current work)
+# Phase 2 (complete)
 python3 email_triage.py phase2-analyse --account <name>     # produces phase2_analysis.json
 python3 email_triage.py phase2-preview --account <name>     # human-readable summary
 python3 email_triage.py phase2-archive --account <name>     # dry run
@@ -90,30 +92,28 @@ The `phase2-analyse` command applies three refinement layers:
 
 Messages classified as `urgent` or `action_needed` are never touched by time decay.
 
-## Uncommitted Changes
+## Next Steps
 
-`email_triage.py` has significant uncommitted changes — the entire Phase 2 implementation (~250 new lines of functions + CLI wiring). Should be committed when the user is ready.
+1. **Set up forwarding** from all accounts to `hello@andrewisherwood.com`
+2. **Adapt the script** to run as a cron job on new mail only
+3. **Morning digest** — what arrived, what was archived, what needs attention
+4. **Auto-unsubscribe** via `List-Unsubscribe` header for confirmed noise senders
 
-## Next Steps (in order)
-
-1. **User reviews phase2 previews** for chef, traiteur, bugle — approves or adjusts
-2. **Run phase2-archive** on approved accounts (dry run first, then --execute)
-3. **Classify hellome** — 6,489 messages in `pass2_remaining.json` need CC-assisted classification → produce `pass2_classification.json`
-4. **Classify yardsale** — 8,991 messages same treatment
-5. **Run phase2 on hellome + yardsale** once classified
-6. **After inbox zero** — forwarding setup, cron job, morning digest (see inbox-zero-phase2.md)
+See `inbox-zero-phase2.md` for full details on post-inbox-zero plans.
 
 ## Key Files
 
 - `email_triage.py` — all logic, single file
 - `accounts.json` — account credentials (sensitive, not committed)
 - `shared_rules.json` — cross-account archive senders
+- `classify_hellome.py` — rule-based classifier for hellome account
+- `classify_yardsale.py` — rule-based classifier for yardsale account
 - `triage_output/<account>/` — per-account data:
   - `pass1_summary.json`, `pass1_sender_report.csv`
   - `archive_rules.json` — Phase 1 sender rules
   - `all_messages.json` — full metadata from pass1
   - `pass2_remaining.json` — messages needing body analysis
-  - `pass2_classification.json` — CC-classified messages
+  - `pass2_classification.json` — classified messages
   - `phase2_analysis.json` — Phase 2 analysis output
 - `project-inbox-zero.md` — original project spec
 - `inbox-zero-phase2.md` — Phase 2 design doc

@@ -489,7 +489,8 @@ def ensure_archive_folder(mail):
     typ, folders = mail.list()
     for f in (folders or []):
         decoded = f.decode() if isinstance(f, bytes) else str(f)
-        if '"Archive"' in decoded or "Archive" in decoded.split('"')[-2:]:
+        # Match both quoted ("Archive") and unquoted (Archive) folder names
+        if '"Archive"' in decoded or decoded.rstrip().endswith(" Archive") or decoded.rstrip().endswith("/Archive"):
             return "Archive"
     # Try to create it
     typ, _ = mail.create("Archive")
